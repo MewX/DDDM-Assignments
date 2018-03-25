@@ -94,7 +94,7 @@ public:
 	 */
 	bool satisfy(Record record) const
 	{
-		const string rVal = record.at(key);
+		const auto rVal = record.at(key);
 		switch (op)
 		{
 		case EQUAL:
@@ -237,6 +237,58 @@ typedef vector<Predicate> PredicateGroup; // grouped by attributes
 typedef map<string, PredicateGroup> PredicateGroups; // <group attribute, predicates>
 
 /**
+ * The fragment class on real nubmer domain
+ */
+class Fragment
+{
+private:
+	vector<PredicateGroup> fragments;
+
+public:
+	Fragment() = default;
+
+	/**
+	 * the constructor takes all the predicates (can with different attributes)
+	 */
+	Fragment(const PredicateGroup &pg) : Fragment()
+	{
+		addPredicates(pg);
+	}
+
+	/**
+	 * the basic operation for adding one new predicate and affecting the fragmentation
+	 */
+	void addSimplePredicate(Predicate p)
+	{
+		// TODO: the main logic for fragmenting
+	}
+
+	/**
+	 * a set of predicates and they are fed for the fragmentation one by one
+	 */
+	void addPredicates(const PredicateGroup &pg)
+	{
+		for (const Predicate &p : pg)
+		{
+			addSimplePredicate(p);
+		}
+	}
+
+	/**
+	 * get a list of numbers (indexes) of the affected fragments by the query
+	 */
+	vector<int> getAffectedFragments(Query query)
+	{
+		// TODO:
+	}
+
+	const vector<PredicateGroup> &getAllFragments() const
+	{
+		return fragments;
+	}
+};
+
+/**
  * This core class for PHF.
  */
 class PrimaryHorizentalFragmentation
@@ -253,9 +305,169 @@ public:
 	PrimaryHorizentalFragmentation(const Table &db, const Queries &queries, const PredicateGroups &predicates)
 		: db(db), queries(queries), predicates(predicates) { }
 
+	/**
+	 * Validate rule 1: each fragment is accessed differently by at least one application
+	 * i.e. no fragment is accessed by the same application set
+	 */
+	bool validateRule1(const PredicateGroup &pg)
+	{
+		// TODO: do the fragments
+		Fragment f(pg);
+
+	}
+
+	/**
+	 * validate relevant rule:
+	 * acc(mi) / card(fi) != acc(mj) / card(fj)
+	 */
+	bool validateRelevant(const Predicate &p)
+	{
+		// TODO:
+	}
+
+	/**
+	 * Validate whether current Pr' is completel
+	 */
+	bool validateComplete(const PredicateGroup &PrQuote)
+	{
+		// TODO
+	}
+
+	/**
+	 * the COM_MIN algorithm
+	 */
+	PredicateGroup comMin()
+	{
+		// map to one-dimension array for this function use only
+		PredicateGroup mergedPredicateGroup;
+		for (const auto &pg : predicates)
+		{
+			for (const auto &p : pg.second)
+			{
+				mergedPredicateGroup.push_back(p);
+			}
+		}
+
+		// begin of COM_MIN algorithm
+		const auto &R = db;
+		auto &Pr = mergedPredicateGroup;
+		PredicateGroup PrQuote; // the output
+
+		for (unsigned i = 0; i < Pr.size(); i++)
+		{
+			PrQuote.push_back(Pr[i]); // Pr' = pi
+			if (validateRule1(PrQuote))
+			{
+				// valid and use it
+				Pr.erase(Pr.begin() + i); // Pr = Pr - pi
+				break;
+			}
+			PrQuote.pop_back();
+		}
+
+		// main loop
+		do
+		{
+			// find a pj in Pr, and pj partitions some current fragments according to Rule 1
+			for (unsigned i = 0; i < Pr.size(); i++)
+			{
+				PrQuote.push_back(Pr[i]); // Pr' = Pr' UNION pi
+				if (validateRule1(PrQuote))
+				{
+					// valid and use it
+					Pr.erase(Pr.begin() + i); // Pr = Pr - pi
+					i--; // the size gets dropped
+
+					// if existing pk in Pr' which is not relevant
+					for (unsigned k = 0; k < PrQuote.size(); k++)
+					{
+						if (!validateRelevant(PrQuote[k]))
+						{
+							PrQuote.erase(PrQuote.begin() + k); // Pr' = Pr' - pk
+							k--; // the size gets dropped
+						}
+					}
+				}
+				else {
+					PrQuote.pop_back();
+				}
+			}
+
+		} while (validateComplete(PrQuote));
+
+		return PrQuote;
+	}
+
+	/**
+	 * determine the set M of minterm prediates
+	 */
+	vector<PredicateGroup> calcSetOfMintermPredicates()
+	{
+		// TODO
+	}
+
+	/**
+	 * determin the set I of implications among pi in Pr'
+	 */
+	vector<PredicateGroup> calcImplicationsAmongPrQuote()
+	{
+		// TODO
+	}
+
+	/**
+	 * test whether mi is contradictory according to I
+	 */
+	bool isContradictory(const vector<PredicateGroup> &I, const PredicateGroup &mi)
+	{
+		// TODO
+	}
+
+	/**
+	 * the algorithm 3.2: PHORIZONTAL algorithm
+	 */
+	vector<PredicateGroup> pHorizontal()
+	{
+		auto PrQuote = comMin();
+		auto M = calcSetOfMintermPredicates();
+		auto I = calcImplicationsAmongPrQuote();
+
+		for (unsigned i = 0; i < M.size(); i++)
+		{
+			if (isContradictory(I, M[i]))
+			{
+				M.erase(M.begin() + i);
+				i--;
+			}
+		}
+		return M;
+	}
+
+	/**
+	 * based on the description of PHORIZONTAL algorithm, it doesn't remove the empty fragments
+	 * so, here I remove all the redundent predicate group
+	 */
+	vector<PredicateGroup> clearEmptyFragments(vector<PredicateGroup> predicateGroups)
+	{
+		// TODO
+	}
+
+	/**
+	 * print all the results
+	 */
+	void printResult()
+	{
+		// TODO
+	}
+
 	void run()
 	{
-		// TODO: the main runner
+		auto result = pHorizontal();
+
+		// remove empty sets (this function is not part of PHORIZONTAL algorithm)
+		result = clearEmptyFragments(result);
+
+		// sort and output
+		printResult();
 	}
 
 };
