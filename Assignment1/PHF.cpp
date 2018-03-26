@@ -60,7 +60,7 @@ class Predicate
 {
 private:
 	// perform 'not' on op
-	const map<Operator, Operator> ANTI_OP_MAP = {
+	map<Operator, Operator> ANTI_OP_MAP = {
 		{EQUAL, NOT_EQUAL},
 		{NOT_EQUAL, EQUAL},
 		{GREATER_THAN, LESS_THAN_OR_EQUAL_TO},
@@ -73,9 +73,9 @@ public:
 	string key, val;
 	Operator op;
 
-	Predicate() { }
+	Predicate() : Predicate("", EQUAL, "0") { }
 
-	Predicate(string key, Operator op, string val) : Predicate()
+	Predicate(string key, Operator op, string val)
 	{
 		this->key = key;
 		this->op = op;
@@ -131,12 +131,12 @@ public:
 	/**
 	 * copy constructor
 	 */
-	Predicate(const Predicate &p)
-	{
-		key = p.key;
-		val = p.val;
-		op = p.op;
-	}
+	//Predicate(const Predicate &p)
+	//{
+	//	key = p.key;
+	//	val = p.val;
+	//	op = p.op;
+	//}
 };
 
 /**
@@ -649,6 +649,7 @@ public:
 		// TODO: do the fragments
 		Fragment f(pg);
 
+		return false;
 	}
 
 	/**
@@ -675,6 +676,7 @@ public:
 		{
 			// TODO:
 		}
+		return false;
 	}
 
 	/**
@@ -821,6 +823,7 @@ public:
 	vector<PredicateGroup> calcSetOfMintermPredicates()
 	{
 		// TODO
+		return {};
 	}
 
 	/**
@@ -829,6 +832,7 @@ public:
 	vector<PredicateGroup> calcImplicationsAmongPrQuote()
 	{
 		// TODO
+		return {};
 	}
 
 	/**
@@ -837,6 +841,7 @@ public:
 	bool isContradictory(const vector<PredicateGroup> &I, const PredicateGroup &mi)
 	{
 		// TODO
+		return false;
 	}
 
 	/**
@@ -866,6 +871,7 @@ public:
 	vector<PredicateGroup> clearEmptyFragments(vector<PredicateGroup> predicateGroups)
 	{
 		// TODO
+		return {};
 	}
 
 	/**
