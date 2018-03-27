@@ -136,6 +136,7 @@ class Table
 {
 private:
 	// The index is currently the "vector<string>"'s index, may add primary key setting
+	vector<ColumnName> columnNames; // the column names ordered by definition
 	map<ColumnName, ColumnValues> db; // db<column names, column values>
 
 public:
@@ -153,6 +154,7 @@ public:
 		for (auto &str : prototype)
 		{
 			transform(str.begin(), str.end(), str.begin(), ::toupper);
+			columnNames.push_back(str);
 			db.insert({ str, ColumnValues() });
 		}
 	}
@@ -162,12 +164,7 @@ public:
 	 */
 	vector<ColumnName> getPrototype() const
 	{
-		vector<ColumnName> ret;
-		for (const auto &c : db)
-		{
-			ret.push_back(c.first);
-		}
-		return ret;
+		return columnNames;
 	}
 
 	/**
@@ -252,6 +249,7 @@ class Fragment
 {
 private:
 	vector<PredicateGroup> fragments;
+	vector<vector<unsigned>> coids; // [fragment id] = <record lists>
 
 public:
 	Fragment() = default;
@@ -259,113 +257,9 @@ public:
 	/**
 	 * the constructor takes all the predicates (can with different attributes)
 	 */
-	Fragment(const PredicateGroup &pg) : Fragment()
+	Fragment(const PredicateGroup &pg, const Table &db) : Fragment()
 	{
-		addPredicates(pg);
-	}
-
-	/**
-	 * test whether given p can fragment current fragments according to Rule1
-	 * TODO: this is not working with rule 1 currently
-	 */
-	bool canPartitionCurrent(const Predicate &p) const
-	{
-		// TODO: rule 1
-		if (fragments.empty()) return true;
-
-		// for each fragment
-		for (int i = fragments.size() - 1; i >= 0; i --)
-		{
-			PredicateGroup relevantPredicates = getPredicatesByAttr(i, p.key);
-			if (relevantPredicates.empty()) return true; // no, need to create for this attribute
-
-			// not empty, need to know whether it is [=/!=] or [</<=/>=/>]
-			// one of them is enough for knowing the type
-			if (p.op == EQUAL || p.op == NOT_EQUAL)
-			{
-				assert(relevantPredicates[0].op == NOT_EQUAL || relevantPredicates.size() == 1);
-
-				// [=/!=]
-				if (relevantPredicates[0].op == NOT_EQUAL)
-				{
-					// only one case that can generate a new fragment
-					bool existing = false;
-					for (const auto &temp : relevantPredicates)
-					{
-						if (temp.val == p.val)
-						{
-							existing = true;
-							break;
-						}
-					}
-
-					// not existing 
-					if (!existing) return true;
-				} // if it's EQUAL, nothing to do
-			}
-			else
-			{
-				// [</<=/>=/>]
-				if (relevantPredicates.size() == 1)
-				{
-					// the simple case
-					const Predicate tempPredicate = relevantPredicates[0];
-					if (tempPredicate.op == GREATER_THAN || tempPredicate.op == GREATER_THAN_OR_EQUAL_TO)
-					{
-						Predicate temp = p;
-						if (temp.op == LESS_THAN || temp.op == LESS_THAN_OR_EQUAL_TO) temp.makeAnti(); // convert to anti form
-
-						if (temp == tempPredicate) continue; // same predicate, no need to continue
-						assert(temp.op == GREATER_THAN || temp.op == GREATER_THAN_OR_EQUAL_TO);
-
-						// too complicated case, not consider right now
-						// e.g. > 10 & >= 10 --> > 10 & = 10
-						assert(tempPredicate.val != temp.val);
-
-						if (tempPredicate.val < temp.val)
-						{
-							return true;
-						} // tempPredicate.val > p.val, not splitable
-					}
-					else
-					{
-						// must be </<=
-						Predicate temp = p;
-						if (temp.op == GREATER_THAN || temp.op == GREATER_THAN_OR_EQUAL_TO) temp.makeAnti(); // convert to anti form
-
-						if (temp == tempPredicate) continue; // same predicate, no need to continue
-						assert(temp.op == LESS_THAN || temp.op == LESS_THAN_OR_EQUAL_TO);
-
-						// too complicated case, not consider right now
-						// e.g. < 10 & <= 10 --> < 10 & = 10
-						assert(tempPredicate.val != temp.val);
-
-						if (tempPredicate.val > temp.val)
-						{
-							return true;
-						} // tempPredicate.val < p.val, not splitable
-					}
-				}
-				else
-				{
-					// can only be size 2
-					assert(relevantPredicates.size() == 2);
-					// between case, sort from op = >/>= to op = </<=
-					if (relevantPredicates[0].op == LESS_THAN || relevantPredicates[0].op == LESS_THAN_OR_EQUAL_TO)
-					{
-						swap(relevantPredicates[0], relevantPredicates[1]);
-					}
-
-					assert(relevantPredicates[0].op == GREATER_THAN || relevantPredicates[0].op == GREATER_THAN_OR_EQUAL_TO);
-					assert(relevantPredicates[1].op == LESS_THAN || relevantPredicates[1].op == LESS_THAN_OR_EQUAL_TO);
-
-					// ignore this case
-					if (p.val <= relevantPredicates[0].val || p.val >= relevantPredicates[1].val) continue;
-					return true;
-				}
-			}
-		}
-		return false;
+		addPredicates(pg, db);
 	}
 
 	/**
@@ -407,7 +301,7 @@ public:
 	/**
 	 * the basic operation for adding one new predicate and affecting the fragmentation
 	 */
-	void addSimplePredicate(const Predicate &p)
+	void addSimplePredicate(const Predicate &p, const Table &db)
 	{
 		Predicate anti = p;
 		anti.makeAnti();
@@ -417,6 +311,11 @@ public:
 		{
 			fragments.push_back({ Predicate(p.key, p.op, p.val) });
 			fragments.push_back({ Predicate(anti.key, anti.op, anti.val) });
+
+			//// classify db
+			//if 
+
+
 			return;
 		}
 
@@ -427,16 +326,20 @@ public:
 			PredicateGroup relevantPredicates = getPredicatesByAttr(i, p.key);
 			if (relevantPredicates.empty())
 			{
-				// no, need to create for this attribute
-				fragments.push_back({ Predicate(p.key, p.op, p.val) });
-				fragments.push_back({ Predicate(anti.key, anti.op, anti.val) });
-				break;
-			}
+				// no, need to create for this attribute on existing fragments
+				PredicateGroup newFragment1 = fragment;
+				newFragment1.push_back(Predicate(p.key, p.op, p.val));
+				PredicateGroup newFragment2 = fragment;
+				newFragment2.push_back(Predicate(anti.key, anti.op, anti.val));
 
-			// not empty, need to know whether it is [=/!=] or [</<=/>=/>]
-			// one of them is enough for knowing the type
-			if (p.op == EQUAL || p.op == NOT_EQUAL)
+				fragments.erase(fragments.begin() + i);
+				fragments.push_back(newFragment1);
+				fragments.push_back(newFragment2);
+			}
+			else if (p.op == EQUAL || p.op == NOT_EQUAL)
 			{
+				// not empty, need to know whether it is [=/!=] or [</<=/>=/>]
+				// one of them is enough for knowing the type
 				assert(relevantPredicates[0].op == NOT_EQUAL || relevantPredicates.size() == 1);
 
 				// [=/!=]
@@ -494,7 +397,7 @@ public:
 						// e.g. > 10 & >= 10 --> > 10 & = 10
 						assert(tempPredicate.val != temp.val);
 
-						if (tempPredicate.val < temp.val)
+						if (atoi(tempPredicate.val.c_str()) < atoi(temp.val.c_str()))
 						{
 							// split into two
 							Predicate leftRight = temp; // </<= tempPredicate </<= leftRight/temp
@@ -526,7 +429,7 @@ public:
 						// e.g. < 10 & <= 10 --> < 10 & = 10
 						assert(tempPredicate.val != temp.val);
 
-						if (tempPredicate.val > temp.val)
+						if (atoi(tempPredicate.val.c_str()) > atoi(temp.val.c_str()))
 						{
 							// split into two
 							Predicate rightLeft = temp; // temp/rightLeft </<= tempPredicate </<= 
@@ -559,7 +462,7 @@ public:
 					assert(relevantPredicates[1].op == LESS_THAN || relevantPredicates[1].op == LESS_THAN_OR_EQUAL_TO);
 
 					// ignore this case
-					if (p.val <= relevantPredicates[0].val || p.val >= relevantPredicates[1].val) continue;
+					if (atoi(p.val.c_str()) <= atoi(relevantPredicates[0].val.c_str()) || atoi(p.val.c_str()) >= atoi(relevantPredicates[1].val.c_str())) continue;
 
 					// now p.val is within the section, find intersection
 					// convert >/>= into </<=
@@ -590,11 +493,11 @@ public:
 	/**
 	 * a set of predicates and they are fed for the fragmentation one by one
 	 */
-	void addPredicates(const PredicateGroup &pg)
+	void addPredicates(const PredicateGroup &pg, const Table &db)
 	{
 		for (const Predicate &p : pg)
 		{
-			addSimplePredicate(p);
+			addSimplePredicate(p, db);
 		}
 	}
 
@@ -632,6 +535,34 @@ private:
 
 		FragmentDetail fragmentDetail; // <fragment id, records>
 		RecordDetail recordDetail; // <record id, access frequency>
+
+		// i is record index
+		// TODO: optimize this for loop
+		for (unsigned i = 0; i < db.size(); i++)
+		{
+			// j is fragment index
+			bool satisfyAll = true;
+			for (unsigned j = 0; j < fragments.size(); j++)
+			{
+				const auto &fragment = fragments[j];
+				satisfyAll = true;
+				for (const auto &p : fragment)
+				{
+					if (!p.satisfy(db.get(i)))
+					{
+						satisfyAll = false;
+						break;
+					}
+				}
+
+				if (satisfyAll)
+				{
+					// this record is in the fragment
+					if (fragmentDetail.count(j) == 0) fragmentDetail.insert({ j, { i } });
+					else fragmentDetail.at(j).push_back(i);
+				}
+			}
+		}
 		
 		// q is query index
 		for (const auto &q : queries)
@@ -646,34 +577,16 @@ private:
 					if (!pred.satisfy(db.get(i)))
 					{
 						satisfyAll = false;
-						break;;
+						break;
 					}
 				}
-				if (!satisfyAll) continue; // curent record is not selected
 
-				// j is fragment index
-				for (unsigned j = 0; j < fragments.size(); j++)
+				// init record map
+				if (recordDetail.count(i) == 0) recordDetail[i] = 0;
+				if (satisfyAll)
 				{
-					const auto &fragment = fragments[j];
-					satisfyAll = true;
-					for (const auto &p : fragment)
-					{
-						if (!p.satisfy(db.get(i)))
-						{
-							satisfyAll = false;
-							break;
-						}
-					}
-
-					// available record
-					if (satisfyAll)
-					{
-						if (recordDetail.count(i) == 0) recordDetail[i] = 1;
-						else recordDetail[i] = recordDetail[i] + 1;
-
-						if (fragmentDetail.count(j) == 0) fragmentDetail.insert({ j, { i } });
-						else fragmentDetail.at(j).push_back(i);
-					}
+					// curent record is selected by the query
+					recordDetail[i] = recordDetail[i] + 1;
 				}
 			}
 		}
@@ -692,13 +605,13 @@ public:
 	 * Validate rule 1: each fragment is accessed differently by at least one application
 	 * i.e. no fragment is accessed by the same application set
 	 */
-	bool validateRule1(const PredicateGroup &pg) const
-	{
-		// TODO: do the fragments
-		Fragment f(pg);
+	//bool validateRule1(const PredicateGroup &pg) const
+	//{
+	//	// TODO: do the fragments
+	//	Fragment f(pg);
 
-		return false;
-	}
+	//	return false;
+	//}
 
 	/**
 	 * validate relevant rule:
@@ -710,7 +623,7 @@ public:
 		for (unsigned i = 0; i < copy.size(); i++)
 		{
 			// copy current minterm predicates where the selected p was ignored
-			if (!(copy[i] == p))
+			if (copy[i] == p)
 			{
 				copy.erase(copy.begin() + i);
 				break;
@@ -738,21 +651,21 @@ public:
 		// it's not used by either application
 		if (accNm == 0 && accNot == 0) return false;
 
+		// if it's empty
+		if (copy.empty()) return true;
+
 		// each fragmeent
 		for (const auto &finfo : fragmentDetail)
 		{
 			// normal form, 'not' form
 			int cardNm = 0, cardNot = 0;
 
-			const auto &fid = finfo.first; // fragment id
-			const auto &records = finfo.second; // fragment records
-
 			// see the two cards
+			const auto &records = finfo.second; // fragment records
 			for (const auto &recordId : records)
 			{
 				// for each record, test whether it's satisfy p
-				auto tp = p;
-				if (tp.satisfy(db.get(recordId))) cardNm++;
+				if (p.satisfy(db.get(recordId))) cardNm++;
 				else cardNot++;
 			}
 
@@ -760,7 +673,7 @@ public:
 			if (cardNm == 0 || cardNot == 0) continue;
 
 			// calc relevant
-			if (abs(1.0 * accNm / cardNm - 1.0 * accNot / cardNot) < 0.0001) return true;
+			if (abs(1.0 * accNm / cardNm - 1.0 * accNot / cardNot) > 0.0001) return true;
 		}
 
 		return false;
@@ -813,7 +726,8 @@ public:
 		for (unsigned i = 0; i < Pr.size(); i++)
 		{
 			PrQuote.push_back(Pr[i]); // Pr' = pi
-			if (validateRule1(PrQuote))
+			//if (validateRule1(PrQuote))
+			if (validateRelevant(PrQuote, PrQuote.back()))
 			{
 				// valid and use it
 				Pr.erase(Pr.begin() + i); // Pr = Pr - pi
@@ -829,24 +743,25 @@ public:
 			for (unsigned i = 0; i < Pr.size(); i++)
 			{
 				PrQuote.push_back(Pr[i]); // Pr' = Pr' UNION pi
-				if (validateRule1(PrQuote))
+				//if (validateRule1(PrQuote))
+				if (validateRelevant(PrQuote, PrQuote.back()))
 				{
 					// valid and use it
 					Pr.erase(Pr.begin() + i); // Pr = Pr - pi
-					i--; // the size gets dropped
-
-					// if existing pk in Pr' which is not relevant
-					for (unsigned k = 0; k < PrQuote.size(); k++)
-					{
-						if (!validateRelevant(PrQuote, PrQuote[k]))
-						{
-							PrQuote.erase(PrQuote.begin() + k); // Pr' = Pr' - pk
-							k--; // the size gets dropped
-						}
-					}
+					break;
 				}
 				else {
 					PrQuote.pop_back();
+				}
+			}
+
+			// if existing pk in Pr' which is not relevant
+			for (unsigned k = 0; k < PrQuote.size(); k++)
+			{
+				if (!validateRelevant(PrQuote, PrQuote[k]))
+				{
+					PrQuote.erase(PrQuote.begin() + k); // Pr' = Pr' - pk
+					k--; // the size gets dropped
 				}
 			}
 
