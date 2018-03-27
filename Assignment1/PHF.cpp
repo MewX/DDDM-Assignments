@@ -52,6 +52,16 @@ const vector<pair<string, Operator>> OP_STRING_MAPPER =
 	{OP_LESS_THAN, LESS_THAN}
 };
 
+// perform 'not' on op
+const map<Operator, Operator> ANTI_OP_MAP = {
+	{EQUAL, NOT_EQUAL},
+	{NOT_EQUAL, EQUAL},
+	{GREATER_THAN, LESS_THAN_OR_EQUAL_TO},
+	{LESS_THAN_OR_EQUAL_TO, GREATER_THAN},
+	{LESS_THAN, GREATER_THAN_OR_EQUAL_TO},
+	{GREATER_THAN_OR_EQUAL_TO, LESS_THAN}
+};
+
 /**
  * The predicate is: key <op> val
  * e.g. TUITIONFEE <GREATER_THAN_OR_EQUAL_TO> 20
@@ -59,23 +69,13 @@ const vector<pair<string, Operator>> OP_STRING_MAPPER =
 class Predicate
 {
 private:
-	// perform 'not' on op
-	map<Operator, Operator> ANTI_OP_MAP = {
-		{EQUAL, NOT_EQUAL},
-		{NOT_EQUAL, EQUAL},
-		{GREATER_THAN, LESS_THAN_OR_EQUAL_TO},
-		{LESS_THAN_OR_EQUAL_TO, GREATER_THAN},
-		{LESS_THAN, GREATER_THAN_OR_EQUAL_TO},
-		{GREATER_THAN_OR_EQUAL_TO, LESS_THAN}
-	};
-
 public:
 	string key, val;
 	Operator op;
 
 	Predicate() : Predicate("", EQUAL, "0") { }
 
-	Predicate(string key, Operator op, string val)
+	Predicate(const string &key, const Operator op, const string &val)
 	{
 		this->key = key;
 		this->op = op;
@@ -128,10 +128,25 @@ public:
 		return val == b.val && op == b.op && key == b.key;
 	}
 
-	/**
-	 * copy constructor
-	 */
-	//Predicate(const Predicate &p)
+	////Predicate& operator=(const Predicate p)
+	////{
+
+	////}
+
+	///**
+	// * lval copy constructor
+	// */
+	//Predicate(const Predicate &p) = default;
+	////{
+	////	key = p.key;
+	////	val = p.val;
+	////	op = p.op;
+	////}
+
+	///**
+	// * rval copy
+	// */
+	//Predicate(Predicate &&p) noexcept
 	//{
 	//	key = p.key;
 	//	val = p.val;
@@ -198,10 +213,10 @@ public:
 	 * get a record as key-value pair
 	 * @return the <key, value> pair
 	 */
-	Record get(int i) const
+	Record get(unsigned i) const
 	{
 		// this is an exception!
-		assert(i >= 0 && i < size());
+		assert(i < size());
 
 		Record ret;
 		for (const auto &c : db)
@@ -231,9 +246,9 @@ public:
 	 * delete a record by index
 	 * @return false if failed; otherwise true
 	 */
-	bool del(int i)
+	bool del(unsigned i)
 	{
-		if (i < 0 || i >= size()) return false;
+		if (i >= size()) return false;
 
 		for (auto &c : db)
 		{
@@ -277,7 +292,7 @@ public:
 
 	/**
 	 * test whether given p can fragment current fragments according to Rule1
-	 * TODO: this is not working with rule 1
+	 * TODO: this is not working with rule 1 currently
 	 */
 	bool canPartitionCurrent(const Predicate &p) const
 	{
@@ -382,9 +397,9 @@ public:
 	/**
 	 * get the predication group from fragment[index] where the attribute is <key>
 	 */
-	PredicateGroup getPredicatesByAttr(const int index, const string &key) const
+	PredicateGroup getPredicatesByAttr(const unsigned index, const string &key) const
 	{
-		assert(index >= 0 && index < fragments.size());
+		assert(index < fragments.size());
 
 		PredicateGroup pg;
 		for (const Predicate &p : fragments[index])
@@ -400,9 +415,9 @@ public:
 	/**
 	 * get the prediction group from fragment[index] where the sttribute of <key> is eliminated
 	 */
-	PredicateGroup getPredicatesWithSpecifiedAttrCleared(const int index, const string &key) const
+	PredicateGroup getPredicatesWithSpecifiedAttrCleared(const unsigned index, const string &key) const
 	{
-		assert(index >= 0 && index < fragments.size());
+		assert(index < fragments.size());
 
 		PredicateGroup pg;
 		for (const Predicate &p : fragments[index])
@@ -624,6 +639,12 @@ public:
 };
 
 /**
+ * For reuse of fragment statistics
+ */
+typedef map<unsigned, vector<unsigned>> FragmentDetail;
+typedef map<unsigned, int> RecordDetail;
+
+/**
  * This core class for PHF.
  */
 class PrimaryHorizentalFragmentation
@@ -633,62 +654,18 @@ private:
 	const Queries &queries;
 	const PredicateGroups &predicates;
 
-public:
 	/**
-	 * the constructor
+	 * Make statistics on given minterm predicates
+	 * 1. each fragment - contained records
+	 * 2. each record - its access frequency
 	 */
-	PrimaryHorizentalFragmentation(const Table &db, const Queries &queries, const PredicateGroups &predicates)
-		: db(db), queries(queries), predicates(predicates) { }
-
-	/**
-	 * Validate rule 1: each fragment is accessed differently by at least one application
-	 * i.e. no fragment is accessed by the same application set
-	 */
-	bool validateRule1(const PredicateGroup &pg) const
-	{
-		// TODO: do the fragments
-		Fragment f(pg);
-
-		return false;
-	}
-
-	/**
-	 * validate relevant rule:
-	 * acc(mi) / card(fi) != acc(mj) / card(fj)
-	 */
-	bool validateRelevant(const PredicateGroup &pg, const Predicate &p) const
-	{
-		PredicateGroup copy = pg;
-		for (unsigned i = 0; i < copy.size(); i++)
-		{
-			if (!(copy[i] == p))
-			{
-				copy.erase(copy.begin() + i);
-				break;
-			}
-		}
-
-		const Fragment f(pg);
-		const auto &fragments = f.getAllFragments();
-
-		// TODO: validate wether p can satisfy the formula
-		for (const auto &fragment : fragments)
-		{
-			// TODO:
-		}
-		return false;
-	}
-
-	/**
-	 * Validate whether current Pr' is completel
-	 */
-	bool validateComplete(const PredicateGroup &PrQuote) const
+	pair<FragmentDetail, RecordDetail> doStatistics(const PredicateGroup &PrQuote) const
 	{
 		const Fragment f(PrQuote);
 		const auto &fragments = f.getAllFragments();
 
-		map<unsigned, vector<unsigned>> fragmentDetail; // <fragment id, records>
-		map<unsigned, int> count; // <record id, access frequency>
+		FragmentDetail fragmentDetail; // <fragment id, records>
+		RecordDetail recordDetail; // <record id, access frequency>
 		
 		// q is query index
 		for (const auto &q : queries)
@@ -725,8 +702,8 @@ public:
 					// available record
 					if (satisfyAll)
 					{
-						if (count.count(i) == 0) count[i] = 1;
-						else count[i] = count[i] + 1;
+						if (recordDetail.count(i) == 0) recordDetail[i] = 1;
+						else recordDetail[i] = recordDetail[i] + 1;
 
 						if (fragmentDetail.count(j) == 0) fragmentDetail.insert({ j, { i } });
 						else fragmentDetail.at(j).push_back(i);
@@ -735,7 +712,77 @@ public:
 			}
 		}
 
+		return { fragmentDetail, recordDetail };
+	}
 
+public:
+	/**
+	 * the constructor
+	 */
+	PrimaryHorizentalFragmentation(const Table &db, const Queries &queries, const PredicateGroups &predicates)
+		: db(db), queries(queries), predicates(predicates) { }
+
+	/**
+	 * Validate rule 1: each fragment is accessed differently by at least one application
+	 * i.e. no fragment is accessed by the same application set
+	 */
+	bool validateRule1(const PredicateGroup &pg) const
+	{
+		// TODO: do the fragments
+		Fragment f(pg);
+
+		return false;
+	}
+
+	/**
+	 * validate relevant rule:
+	 * acc(mi) / card(fi) != acc(mj) / card(fj)
+	 */
+	bool validateRelevant(const PredicateGroup &pg, const Predicate &p) const
+	{
+		PredicateGroup copy = pg;
+		for (unsigned i = 0; i < copy.size(); i++)
+		{
+			// copy current minterm predicates where the selected p was ignored
+			if (!(copy[i] == p))
+			{
+				copy.erase(copy.begin() + i);
+				break;
+			}
+		}
+
+		// do the statistics
+		auto temp = doStatistics(pg);
+		const auto &fragmentDetail = temp.first; // fragment id - list of record ids
+		const auto &recordDetail = temp.second; // record id - access frequency
+
+		for (const auto &fragment : fragmentDetail)
+		{
+			// normal form, 'not' form
+			int accNm = 0, cardNm = 0, accNot = 0, cardNot = 0;
+			for (const auto &app : queries)
+			{
+				// TODO:
+			}
+		}
+
+
+		// TODO: validate wether p can satisfy the formula
+		//for (const auto &fragment : fragments)
+		//{
+		//	// TODO: find data in this fragment
+		//}
+		return false;
+	}
+
+	/**
+	 * Validate whether current Pr' is completel
+	 */
+	bool validateComplete(const PredicateGroup &PrQuote) const
+	{
+		auto temp = doStatistics(PrQuote);
+		const auto &fragmentDetail = temp.first;
+		const auto &recordDetail = temp.second;
 
 		// validate: in every fragment, the records inside should have the same access frequency
 		map<int, int> fragmentValidator; // <fragment id, access frenquency that should be>
@@ -744,8 +791,8 @@ public:
 			const int &fid = finfo.first;
 			for (const auto &recordId : finfo.second)
 			{
-				if (fragmentValidator.count(fid) == 0) fragmentValidator[fid] = count[recordId];
-				else if (fragmentValidator[fid] != count[recordId]) return false;
+				if (fragmentValidator.count(fid) == 0) fragmentValidator[fid] = recordDetail.at(recordId);
+				else if (fragmentValidator[fid] != recordDetail.at(recordId)) return false;
 			}
 		}
 
