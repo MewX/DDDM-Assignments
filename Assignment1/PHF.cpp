@@ -14,6 +14,16 @@
 
 using namespace std;
 
+// delete those functions becuase numbers are stored in strings in this assignment
+template<class _Elem, class _Traits, class _Alloc>
+bool operator<(const basic_string<_Elem, _Traits, _Alloc>& _Left, const basic_string<_Elem, _Traits, _Alloc>& _Right) = delete;
+template<class _Elem, class _Traits, class _Alloc>
+bool operator>(const basic_string<_Elem, _Traits, _Alloc>& _Left, const basic_string<_Elem, _Traits, _Alloc>& _Right) = delete;
+template<class _Elem, class _Traits, class _Alloc>
+bool operator<=(const basic_string<_Elem, _Traits, _Alloc>& _Left, const basic_string<_Elem, _Traits, _Alloc>& _Right) = delete;
+template<class _Elem, class _Traits, class _Alloc>
+bool operator>=(const basic_string<_Elem, _Traits, _Alloc>& _Left, const basic_string<_Elem, _Traits, _Alloc>& _Right) = delete;
+
 // type defines
 typedef string ColumnName;
 typedef map<ColumnName, string> Record; // Record = Tuple
@@ -275,7 +285,7 @@ private:
 	 * fragment the existing fragments
 	 * @return satisfying newFilter, satisfying not newFilter
 	 */
-	pair<FragmentRecordIds, FragmentRecordIds> filterFragment(const Predicate &newFilter, const FragmentRecordIds &oldFragmentIds, const Table &db)
+	static pair<FragmentRecordIds, FragmentRecordIds> filterFragment(const Predicate &newFilter, const FragmentRecordIds &oldFragmentIds, const Table &db)
 	{
 		FragmentRecordIds retPositive, retNegative;
 		for (const auto &id : oldFragmentIds)
@@ -739,14 +749,12 @@ public:
 		}
 
 		// begin of COM_MIN algorithm
-		const auto &R = db;
 		auto &Pr = mergedPredicateGroup;
 		PredicateGroup PrQuote; // the output
 
 		for (unsigned i = 0; i < Pr.size(); i++)
 		{
 			PrQuote.push_back(Pr[i]); // Pr' = pi
-			//if (validateRule1(PrQuote))
 			if (validateRelevant(PrQuote, PrQuote.back()))
 			{
 				// valid and use it
@@ -763,16 +771,13 @@ public:
 			for (unsigned i = 0; i < Pr.size(); i++)
 			{
 				PrQuote.push_back(Pr[i]); // Pr' = Pr' UNION pi
-				//if (validateRule1(PrQuote))
 				if (validateRelevant(PrQuote, PrQuote.back()))
 				{
 					// valid and use it
 					Pr.erase(Pr.begin() + i); // Pr = Pr - pi
 					break;
 				}
-				else {
-					PrQuote.pop_back();
-				}
+				PrQuote.pop_back();
 			}
 
 			// if existing pk in Pr' which is not relevant
