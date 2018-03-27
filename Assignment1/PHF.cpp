@@ -241,6 +241,7 @@ typedef vector<Query> Queries;
  */
 typedef vector<Predicate> PredicateGroup; // grouped by attributes
 typedef map<string, PredicateGroup> PredicateGroups; // <group attribute, predicates>
+typedef vector<unsigned> FragmentRecordIds; // the record ids in a fragment
 
 /**
  * The fragment class on real nubmer domain
@@ -249,7 +250,41 @@ class Fragment
 {
 private:
 	vector<PredicateGroup> fragments;
-	vector<vector<unsigned>> coids; // [fragment id] = <record lists>
+	vector<FragmentRecordIds> coids; // [fragment id] = <record lists>
+
+	/**
+	 * detele a fragment as well as its id list
+	 */
+	void deleteFragment(const unsigned index)
+	{
+		assert(index < fragments.size());
+		fragments.erase(fragments.begin() + index);
+		coids.erase(coids.begin() + index);
+	}
+
+	/**
+	 * add a new fragment as well as its id list
+	 */
+	void addFragment(const PredicateGroup &newFragment, const FragmentRecordIds &newCoids)
+	{
+		fragments.push_back(newFragment);
+		coids.push_back(newCoids);
+	}
+
+	/**
+	 * fragment the existing fragments
+	 * @return satisfying newFilter, satisfying not newFilter
+	 */
+	pair<FragmentRecordIds, FragmentRecordIds> filterFragment(const Predicate &newFilter, const FragmentRecordIds &oldFragmentIds, const Table &db)
+	{
+		FragmentRecordIds retPositive, retNegative;
+		for (const auto &id : oldFragmentIds)
+		{
+			if (newFilter.satisfy(db.get(id))) retPositive.push_back(id);
+			else retNegative.push_back(id);
+		}
+		return { retPositive, retNegative };
+	}
 
 public:
 	Fragment() = default;
@@ -309,13 +344,12 @@ public:
 		// if there's no fragment
 		if (fragments.empty())
 		{
-			fragments.push_back({ Predicate(p.key, p.op, p.val) });
-			fragments.push_back({ Predicate(anti.key, anti.op, anti.val) });
+			FragmentRecordIds def; // default one
+			for (unsigned i = 0; i < db.size(); i++) def.push_back(i);
 
-			//// classify db
-			//if 
-
-
+			const auto ids = filterFragment(p, def, db);
+			addFragment({ Predicate(p.key, p.op, p.val) }, ids.first);
+			addFragment({ Predicate(anti.key, anti.op, anti.val) }, ids.second);
 			return;
 		}
 
@@ -332,9 +366,10 @@ public:
 				PredicateGroup newFragment2 = fragment;
 				newFragment2.push_back(Predicate(anti.key, anti.op, anti.val));
 
-				fragments.erase(fragments.begin() + i);
-				fragments.push_back(newFragment1);
-				fragments.push_back(newFragment2);
+				const auto ids = filterFragment(p, coids[i], db);
+				deleteFragment(i);
+				addFragment(newFragment1, ids.first);
+				addFragment(newFragment2, ids.second);
 			}
 			else if (p.op == EQUAL || p.op == NOT_EQUAL)
 			{
@@ -372,9 +407,10 @@ public:
 						oneEqual.push_back(pPositive); // one positive case
 						
 						// update fragments
-						fragments.erase(fragments.begin() + i);
-						fragments.push_back(manyNotEqual);
-						fragments.push_back(oneEqual);
+						const auto ids = filterFragment(pPositive, coids[i], db);
+						deleteFragment(i);
+						addFragment(oneEqual, ids.first);
+						addFragment(manyNotEqual, ids.second);
 					}
 				} // if it's EQUAL, nothing to do
 			}
@@ -411,9 +447,10 @@ public:
 							rightPart.push_back(temp);
 
 							// update fragments
-							fragments.erase(fragments.begin() + i);
-							fragments.push_back(leftPart);
-							fragments.push_back(rightPart);
+							const auto ids = filterFragment(leftRight, coids[i], db);
+							deleteFragment(i);
+							addFragment(leftPart, ids.first);
+							addFragment(rightPart, ids.second);
 						} // tempPredicate.val > p.val, not splitable
 					}
 					else
@@ -443,9 +480,10 @@ public:
 							leftPart.push_back(temp);
 
 							// update fragments
-							fragments.erase(fragments.begin() + i);
-							fragments.push_back(leftPart);
-							fragments.push_back(rightPart);
+							const auto ids = filterFragment(rightLeft, coids[i], db);
+							deleteFragment(i);
+							addFragment(rightPart, ids.first);
+							addFragment(leftPart, ids.second);
 						} // tempPredicate.val < p.val, not splitable
 					}
 				}
@@ -482,9 +520,10 @@ public:
 					rightPart.push_back(forRight);
 
 					// update fragments
-					fragments.erase(fragments.begin() + i);
-					fragments.push_back(leftPart);
-					fragments.push_back(rightPart);
+					const auto ids = filterFragment(forRight, coids[i], db);
+					deleteFragment(i);
+					addFragment(rightPart, ids.first);
+					addFragment(leftPart, ids.second);
 				}
 			}
 		}
@@ -501,9 +540,17 @@ public:
 		}
 	}
 
+	/**
+	 * simply return the reference of the calculated fragments
+	 */
 	const vector<PredicateGroup> &getAllFragments() const
 	{
 		return fragments;
+	}
+
+	const vector<FragmentRecordIds> &getFragmentRecordIds() const
+	{
+		return coids;
 	}
 };
 
@@ -530,38 +577,17 @@ private:
 	 */
 	pair<FragmentDetail, RecordDetail> doStatistics(const PredicateGroup &PrQuote) const
 	{
-		const Fragment f(PrQuote);
+		const Fragment f(PrQuote, db);
 		const auto &fragments = f.getAllFragments();
 
 		FragmentDetail fragmentDetail; // <fragment id, records>
 		RecordDetail recordDetail; // <record id, access frequency>
 
 		// i is record index
-		// TODO: optimize this for loop
-		for (unsigned i = 0; i < db.size(); i++)
+		const auto &fragmentRec = f.getFragmentRecordIds();
+		for (unsigned i = 0; i < fragments.size(); i ++)
 		{
-			// j is fragment index
-			bool satisfyAll = true;
-			for (unsigned j = 0; j < fragments.size(); j++)
-			{
-				const auto &fragment = fragments[j];
-				satisfyAll = true;
-				for (const auto &p : fragment)
-				{
-					if (!p.satisfy(db.get(i)))
-					{
-						satisfyAll = false;
-						break;
-					}
-				}
-
-				if (satisfyAll)
-				{
-					// this record is in the fragment
-					if (fragmentDetail.count(j) == 0) fragmentDetail.insert({ j, { i } });
-					else fragmentDetail.at(j).push_back(i);
-				}
-			}
+			fragmentDetail[i] = fragmentRec[i];
 		}
 		
 		// q is query index
