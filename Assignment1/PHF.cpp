@@ -68,7 +68,6 @@ const map<Operator, Operator> ANTI_OP_MAP = {
  */
 class Predicate
 {
-private:
 public:
 	string key, val;
 	Operator op;
@@ -94,13 +93,13 @@ public:
 	 * test whether the table record satisfies current predicate.
 	 * @return true if satisfied; otherwise false
 	 */
-	bool satisfy(Record record) const
+	bool satisfy(const Record &record) const
 	{
 		const auto rVal = record.at(key);
 		switch (op)
 		{
 		case EQUAL:
-			return rVal == val;
+			return rVal == val || val == "?"; // Note: query target is not considered in assignment 1
 
 		case NOT_EQUAL:
 			return rVal != val;
@@ -127,31 +126,6 @@ public:
 	{
 		return val == b.val && op == b.op && key == b.key;
 	}
-
-	////Predicate& operator=(const Predicate p)
-	////{
-
-	////}
-
-	///**
-	// * lval copy constructor
-	// */
-	//Predicate(const Predicate &p) = default;
-	////{
-	////	key = p.key;
-	////	val = p.val;
-	////	op = p.op;
-	////}
-
-	///**
-	// * rval copy
-	// */
-	//Predicate(Predicate &&p) noexcept
-	//{
-	//	key = p.key;
-	//	val = p.val;
-	//	op = p.op;
-	//}
 };
 
 /**
@@ -624,14 +598,6 @@ public:
 		}
 	}
 
-	/**
-	 * get a list of numbers (indexes) of the affected fragments by the query
-	 */
-	vector<int> getAffectedFragments(Query query)
-	{
-		// TODO:
-	}
-
 	const vector<PredicateGroup> &getAllFragments() const
 	{
 		return fragments;
@@ -752,26 +718,51 @@ public:
 		}
 
 		// do the statistics
-		auto temp = doStatistics(pg);
-		const auto &fragmentDetail = temp.first; // fragment id - list of record ids
-		const auto &recordDetail = temp.second; // record id - access frequency
+		const auto &fragmentDetail = doStatistics(copy).first; // fragment id - list of record ids
 
-		for (const auto &fragment : fragmentDetail)
+		// loop through all the applications
+		// acc(mi) == acc(qi)
+		int accNm = 0, accNot = 0;
+		for (const auto &app : queries)
 		{
-			// normal form, 'not' form
-			int accNm = 0, cardNm = 0, accNot = 0, cardNot = 0;
-			for (const auto &app : queries)
+			for (const auto &predicate : app)
 			{
-				// TODO:
+				auto tp = p;
+				if (predicate == tp) accNm++;
+
+				tp.makeAnti();
+				if (predicate == tp) accNot++;
 			}
 		}
 
+		// it's not used by either application
+		if (accNm == 0 && accNot == 0) return false;
 
-		// TODO: validate wether p can satisfy the formula
-		//for (const auto &fragment : fragments)
-		//{
-		//	// TODO: find data in this fragment
-		//}
+		// each fragmeent
+		for (const auto &finfo : fragmentDetail)
+		{
+			// normal form, 'not' form
+			int cardNm = 0, cardNot = 0;
+
+			const auto &fid = finfo.first; // fragment id
+			const auto &records = finfo.second; // fragment records
+
+			// see the two cards
+			for (const auto &recordId : records)
+			{
+				// for each record, test whether it's satisfy p
+				auto tp = p;
+				if (tp.satisfy(db.get(recordId))) cardNm++;
+				else cardNot++;
+			}
+
+			// I don't want useless frgments
+			if (cardNm == 0 || cardNot == 0) continue;
+
+			// calc relevant
+			if (abs(1.0 * accNm / cardNm - 1.0 * accNot / cardNot) < 0.0001) return true;
+		}
+
 		return false;
 	}
 
@@ -780,7 +771,7 @@ public:
 	 */
 	bool validateComplete(const PredicateGroup &PrQuote) const
 	{
-		auto temp = doStatistics(PrQuote);
+		const auto temp = doStatistics(PrQuote);
 		const auto &fragmentDetail = temp.first;
 		const auto &recordDetail = temp.second;
 
