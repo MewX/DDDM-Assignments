@@ -571,17 +571,13 @@ private:
 	const PredicateGroups &predicates;
 
 	/**
-	 * Make statistics on given minterm predicates
-	 * 1. each fragment - contained records
-	 * 2. each record - its access frequency
+	 * calc: each fragment - contained records
 	 */
-	pair<FragmentDetail, RecordDetail> doStatistics(const PredicateGroup &PrQuote) const
+	FragmentDetail calcFragmentDetail(const PredicateGroup &PrQuote) const
 	{
 		const Fragment f(PrQuote, db);
 		const auto &fragments = f.getAllFragments();
-
 		FragmentDetail fragmentDetail; // <fragment id, records>
-		RecordDetail recordDetail; // <record id, access frequency>
 
 		// i is record index
 		const auto &fragmentRec = f.getFragmentRecordIds();
@@ -589,6 +585,16 @@ private:
 		{
 			fragmentDetail[i] = fragmentRec[i];
 		}
+		
+		return fragmentDetail;
+	}
+
+	/**
+	 * calc: each record - its access frequency
+	 */
+	RecordDetail calcRecordDetail() const
+	{
+		RecordDetail recordDetail; // <record id, access frequency>
 		
 		// q is query index
 		for (const auto &q : queries)
@@ -617,8 +623,9 @@ private:
 			}
 		}
 
-		return { fragmentDetail, recordDetail };
+		return recordDetail;
 	}
+
 
 public:
 	/**
@@ -626,18 +633,6 @@ public:
 	 */
 	PrimaryHorizentalFragmentation(const Table &db, const Queries &queries, const PredicateGroups &predicates)
 		: db(db), queries(queries), predicates(predicates) { }
-
-	/**
-	 * Validate rule 1: each fragment is accessed differently by at least one application
-	 * i.e. no fragment is accessed by the same application set
-	 */
-	//bool validateRule1(const PredicateGroup &pg) const
-	//{
-	//	// TODO: do the fragments
-	//	Fragment f(pg);
-
-	//	return false;
-	//}
 
 	/**
 	 * validate relevant rule:
@@ -657,7 +652,7 @@ public:
 		}
 
 		// do the statistics
-		const auto &fragmentDetail = doStatistics(copy).first; // fragment id - list of record ids
+		const auto &fragmentDetail = calcFragmentDetail(copy); // fragment id - list of record ids
 
 		// loop through all the applications
 		// acc(mi) == acc(qi)
@@ -710,9 +705,8 @@ public:
 	 */
 	bool validateComplete(const PredicateGroup &PrQuote) const
 	{
-		const auto temp = doStatistics(PrQuote);
-		const auto &fragmentDetail = temp.first;
-		const auto &recordDetail = temp.second;
+		const auto fragmentDetail = calcFragmentDetail(PrQuote);
+		const auto recordDetail = calcRecordDetail();
 
 		// validate: in every fragment, the records inside should have the same access frequency
 		map<int, int> fragmentValidator; // <fragment id, access frenquency that should be>
