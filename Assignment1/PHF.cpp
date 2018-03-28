@@ -745,6 +745,43 @@ public:
 	}
 
 	/**
+	 * The optimized com_min algorithm - much faster
+	 */
+	PredicateGroup comMinOptimized()
+	{
+		PredicateGroup ret;
+		PredicateGroup mergedPredicateGroup;
+		for (const auto &pg : predicates)
+		{
+			for (const auto &p : pg.second)
+			{
+				mergedPredicateGroup.push_back(p);
+			}
+		}
+
+		for (const auto &app : queries)
+		{
+			for (const auto &q : app)
+			{
+				for (unsigned i = 0; i < mergedPredicateGroup.size(); i ++)
+				{
+					if (q.key == mergedPredicateGroup[i].key)
+					{
+						if ((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op && q.val == mergedPredicateGroup[i].val || q.val == mergedPredicateGroup[i].val)
+						{
+							ret.push_back(q);
+							mergedPredicateGroup.erase(mergedPredicateGroup.begin() + i);
+							break;
+						}
+					}
+				}
+
+			}
+		}
+		return ret;
+	}
+
+	/**
 	 * the COM_MIN algorithm
 	 */
 	PredicateGroup comMin()
@@ -809,49 +846,71 @@ public:
 	/**
 	 * determine the set M of minterm prediates
 	 */
-	vector<PredicateGroup> calcSetOfMintermPredicates()
+	//vector<PredicateGroup> calcSetOfMintermPredicates()
+	//{
+	//	// TODO
+	//	return {};
+	//}
+
+	/**
+	 * determin the set I of implications among pi in Pr'
+	 * a set of predicates can be replaced by 
+	 */
+	vector<pair<PredicateGroup, Predicate>> calcImplicationsAmongPrQuote()
 	{
 		// TODO
 		return {};
 	}
 
 	/**
-	 * determin the set I of implications among pi in Pr'
+	 * for usual predicate, its implications are very simple - not(predicate)
+	 * However, for enumerate types, its implcations are a bit complicated
 	 */
-	vector<PredicateGroup> calcImplicationsAmongPrQuote()
-	{
-		// TODO
-		return {};
-	}
+	//void eliminateImplications(vector<PredicateGroup> &fragments)
+	//{
+	//	for (unsigned i = 0; i < fragments.size(); i ++)
+	//	{
+	//		PredicateGroup &f = fragments[i];
+	//		if (!f.empty() && f[0].op == NOT_EQUAL)
+	//		{
+	//			// enumerate type! and it is NOT_EQUAL
+	//			if (f[0].key == "UNIVERSITY" && f.size() == 2)
+	//			{
+	//				// replace it with the reset one when it's in the 
+
+	//			}
+
+	//		}
+	//	}
+	//	
+	//}
 
 	/**
 	 * test whether mi is contradictory according to I
 	 */
-	bool isContradictory(const vector<PredicateGroup> &I, const PredicateGroup &mi)
-	{
-		// TODO
-		return false;
-	}
+	//bool isContradictory(const vector<PredicateGroup> &I, const PredicateGroup &mi)
+	//{
+	//	// TODO
+	//	return false;
+	//}
 
 	/**
 	 * the algorithm 3.2: PHORIZONTAL algorithm
 	 */
-	Fragment pHorizontal()
+	void pHorizontal()
 	{
-		auto PrQuote = comMin();
-		//auto M = calcSetOfMintermPredicates();
-		//auto I = calcImplicationsAmongPrQuote();
+		//auto PrQuote = comMin();
+		auto PrQuote = comMinOptimized();
 
-		//for (unsigned i = 0; i < M.size(); i++)
-		//{
-		//	if (isContradictory(I, M[i]))
-		//	{
-		//		M.erase(M.begin() + i);
-		//		i--;
-		//	}
-		//}
-		//return M;
-		return Fragment(PrQuote, db);
+		// TODO: use $queries to generate Implications
+
+		auto result = Fragment(PrQuote, db);
+
+		// remove empty sets (this function is not part of PHORIZONTAL algorithm)
+		auto fragments = clearEmptyFragments(result);
+
+		// sort and output
+		printResult(fragments);
 	}
 
 	/**
@@ -874,6 +933,9 @@ public:
 		return ret;
 	}
 
+	/**
+	 * print one predicate
+	 */
 	void printOnePredicate(const Predicate &p, const int &count) const
 	{
 		if (count != 0) cout << "\t";
@@ -944,18 +1006,6 @@ public:
 			cout << endl;
 		}
 	}
-
-	void run()
-	{
-		auto result = pHorizontal();
-
-		// remove empty sets (this function is not part of PHORIZONTAL algorithm)
-		auto fragments = clearEmptyFragments(result);
-
-		// sort and output
-		printResult(fragments);
-	}
-
 };
 
 /**
@@ -1148,7 +1198,7 @@ int main(int argc, char **argv)
 
 	// run the algorithm
 	PrimaryHorizentalFragmentation phf(inTable, inQueries, inPredicateGroups);
-	phf.run();
+	phf.pHorizontal();
 
 	// used for Visual Studio 2017 debugging output
 #ifdef _MSC_VER
