@@ -277,7 +277,7 @@ private:
 	 */
 	void deleteFragment(const unsigned index)
 	{
-		assert(index < fragments.size() && fragments.size() == coids.size());
+		assert(index < fragments.size());
 		fragments.erase(fragments.begin() + index);
 		coids.erase(coids.begin() + index);
 	}
@@ -287,7 +287,6 @@ private:
 	 */
 	void addFragment(const PredicateGroup &newFragment, const FragmentRecordIds &newCoids)
 	{
-		assert(fragments.size() == coids.size());
 		fragments.push_back(newFragment);
 		coids.push_back(newCoids);
 	}
@@ -356,7 +355,7 @@ public:
 
 	/**
 	 * the basic operation for adding one new predicate and affecting the fragmentation
-	 * TODO: this process is a bit slow, the next step to optimize this function is to find whether it does something unnecessary
+	 * TODO: the next step to optimize this function is to find whether it does something unnecessary
 	 */
 	void addSimplePredicate(const Predicate &p, const Table &db)
 	{
@@ -517,7 +516,6 @@ public:
 					{
 						swap(relevantPredicates[0], relevantPredicates[1]);
 					}
-					// TODO: if same, continue
 
 					assert(relevantPredicates[0].op == GREATER_THAN || relevantPredicates[0].op == GREATER_THAN_OR_EQUAL_TO);
 					assert(relevantPredicates[1].op == LESS_THAN || relevantPredicates[1].op == LESS_THAN_OR_EQUAL_TO);
@@ -536,7 +534,7 @@ public:
 					assert(forRight.op == GREATER_THAN || forRight.op == GREATER_THAN_OR_EQUAL_TO);
 
 					PredicateGroup leftPart = getPredicatesWithSpecifiedAttrCleared(i, p.key);
-					PredicateGroup rightPart = leftPart; // memory copy is a bit faster than simply filter
+					PredicateGroup rightPart = leftPart; // memory copy is a bit faster
 					leftPart.push_back(relevantPredicates[0]);
 					leftPart.push_back(temp);
 					rightPart.push_back(relevantPredicates[1]);
@@ -647,77 +645,6 @@ private:
 		}
 
 		return recordDetail;
-	}
-
-	/**
-	 * Make statistics on given minterm predicates
-	 * 1. each fragment - contained records
-	 * 2. each record - its access frequency
-	 */
-	pair<FragmentDetail, vector<PredicateGroup>> doStatistics(const PredicateGroup &PrQuote) const
-	{
-		const Fragment f(PrQuote, db);
-		const auto &fragments = f.getAllFragments();
-
-		FragmentDetail fragmentDetail; // <fragment id, records>
-		RecordDetail recordDetail; // <record id, access frequency>
-
-		// i is record index
-		// TODO: optimize this for loop
-		for (unsigned i = 0; i < db.size(); i++)
-		{
-			// j is fragment index
-			bool satisfyAll = true;
-			for (unsigned j = 0; j < fragments.size(); j++)
-			{
-				const auto &fragment = fragments[j];
-				satisfyAll = true;
-				for (const auto &p : fragment)
-				{
-					if (!p.satisfy(db.get(i)))
-					{
-						satisfyAll = false;
-						break;
-					}
-				}
-
-				if (satisfyAll)
-				{
-					// this record is in the fragment
-					if (fragmentDetail.count(j) == 0) fragmentDetail.insert({ j, { i } });
-					else fragmentDetail.at(j).push_back(i);
-				}
-			}
-		}
-		
-		// q is query index
-		for (const auto &q : queries)
-		{
-			// i is record index
-			for (unsigned i = 0; i < db.size(); i++)
-			{
-				// if it't selected from this query
-				bool satisfyAll = true;
-				for (const auto &pred : q)
-				{
-					if (!pred.satisfy(db.get(i)))
-					{
-						satisfyAll = false;
-						break;
-					}
-				}
-
-				// init record map
-				if (recordDetail.count(i) == 0) recordDetail[i] = 0;
-				if (satisfyAll)
-				{
-					// curent record is selected by the query
-					recordDetail[i] = recordDetail[i] + 1;
-				}
-			}
-		}
-
-		return { fragmentDetail, fragments };
 	}
 
 
@@ -839,11 +766,16 @@ public:
 			{
 				for (unsigned i = 0; i < mergedPredicateGroup.size(); i ++)
 				{
-					if (q == mergedPredicateGroup[i])
+					if (mergedPredicateGroup[i].val == "?") continue;
+					if (q.key == mergedPredicateGroup[i].key)
 					{
-						ret.push_back(q);
-						mergedPredicateGroup.erase(mergedPredicateGroup.begin() + i);
-						break;
+						// for enum type, must full match; otherwise only number matching is enough becuase in fragmentation it will pick the not(predicate) automatically
+						if ((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op && q.val == mergedPredicateGroup[i].val || q.val == mergedPredicateGroup[i].val)
+						{
+							ret.push_back(q);
+							mergedPredicateGroup.erase(mergedPredicateGroup.begin() + i);
+							break;
+						}
 					}
 				}
 			}
@@ -920,11 +852,10 @@ public:
 	{
 		//auto PrQuote = comMin();
 		const auto PrQuote = comMinOptimized();
-		//const auto result = Fragment(PrQuote, db);
-		const auto &statistics = doStatistics(PrQuote);
+		const auto result = Fragment(PrQuote, db);
 
 		// remove empty sets (this function is not part of PHORIZONTAL algorithm)
-		const auto fragments = clearEmptyFragments(statistics.first, statistics.second);
+		const auto fragments = clearEmptyFragments(result);
 
 		// sort and output
 		printResult(fragments);
@@ -934,23 +865,18 @@ public:
 	 * based on the description of PHORIZONTAL algorithm, it doesn't remove the empty fragments
 	 * so, here I remove all the redundent predicate group
 	 */
-	static vector<PredicateGroup> clearEmptyFragments(const FragmentDetail &fragment, const vector<PredicateGroup> &records)
+	static vector<PredicateGroup> clearEmptyFragments(const Fragment &f)
 	{
 		vector<PredicateGroup> ret;
-		for (const auto &temp : fragment)
+		const auto &fragment = f.getAllFragments();
+		const auto &records = f.getFragmentRecordIds();
+		for (unsigned i = 0; i < records.size(); i ++)
 		{
-			if (!temp.second.empty())
+			if (!records[i].empty())
 			{
-				ret.push_back(records[temp.first]);
+				ret.push_back(fragment[i]);
 			}
 		}
-		//for (unsigned i = 0; i < fragment.size(); i ++)
-		//{
-		//	if (!fragment.at(i).empty())
-		//	{
-		//		ret.push_back(records.at(i));
-		//	}
-		//}
 
 		return ret;
 	}
@@ -1021,7 +947,7 @@ public:
 						printOnePredicate(temp[1], count++);
 					}
 
-					// always have one, so output the last one
+					// always have one
 					printOnePredicate(temp[0], count++);
 				}
 			}
