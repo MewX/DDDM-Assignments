@@ -11,6 +11,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cassert>
+#include <iostream>
 
 using namespace std;
 
@@ -60,6 +61,15 @@ const vector<pair<string, Operator>> OP_STRING_MAPPER =
 	{OP_EQUAL, EQUAL},
 	{OP_GREATER_THAN, GREATER_THAN},
 	{OP_LESS_THAN, LESS_THAN}
+};
+const map<Operator, string> STRING_OP_MAPPER =
+{
+	{NOT_EQUAL, OP_NOT_EQUAL},
+	{GREATER_THAN_OR_EQUAL_TO, OP_GREATER_THAN_OR_EQUAL_TO, },
+	{LESS_THAN_OR_EQUAL_TO, OP_LESS_THAN_OR_EQUAL_TO},
+	{EQUAL, OP_EQUAL},
+	{GREATER_THAN, OP_GREATER_THAN},
+	{LESS_THAN, OP_LESS_THAN}
 };
 
 // perform 'not' on op
@@ -345,6 +355,7 @@ public:
 
 	/**
 	 * the basic operation for adding one new predicate and affecting the fragmentation
+	 * TODO: the next step to optimize this function is to find whether it does something unnecessary
 	 */
 	void addSimplePredicate(const Predicate &p, const Table &db)
 	{
@@ -825,39 +836,113 @@ public:
 	/**
 	 * the algorithm 3.2: PHORIZONTAL algorithm
 	 */
-	vector<PredicateGroup> pHorizontal()
+	Fragment pHorizontal()
 	{
 		auto PrQuote = comMin();
-		auto M = calcSetOfMintermPredicates();
-		auto I = calcImplicationsAmongPrQuote();
+		//auto M = calcSetOfMintermPredicates();
+		//auto I = calcImplicationsAmongPrQuote();
 
-		for (unsigned i = 0; i < M.size(); i++)
-		{
-			if (isContradictory(I, M[i]))
-			{
-				M.erase(M.begin() + i);
-				i--;
-			}
-		}
-		return M;
+		//for (unsigned i = 0; i < M.size(); i++)
+		//{
+		//	if (isContradictory(I, M[i]))
+		//	{
+		//		M.erase(M.begin() + i);
+		//		i--;
+		//	}
+		//}
+		//return M;
+		return Fragment(PrQuote, db);
 	}
 
 	/**
 	 * based on the description of PHORIZONTAL algorithm, it doesn't remove the empty fragments
 	 * so, here I remove all the redundent predicate group
 	 */
-	vector<PredicateGroup> clearEmptyFragments(vector<PredicateGroup> predicateGroups)
+	vector<PredicateGroup> clearEmptyFragments(const Fragment &f)
 	{
-		// TODO
-		return {};
+		vector<PredicateGroup> ret;
+		const auto &fragment = f.getAllFragments();
+		const auto &records = f.getFragmentRecordIds();
+		for (unsigned i = 0; i < records.size(); i ++)
+		{
+			if (!records[i].empty())
+			{
+				ret.push_back(fragment[i]);
+			}
+		}
+
+		return ret;
+	}
+
+	void printOnePredicate(const Predicate &p, const int &count) const
+	{
+		if (count != 0) cout << "\t";
+		cout << p.key << STRING_OP_MAPPER.at(p.op) << p.val;
 	}
 
 	/**
 	 * print all the results
 	 */
-	void printResult()
+	void printResult(const vector<PredicateGroup> &p)
 	{
-		// TODO
+		// TODO: sorting can optimize
+		for (const auto &a : p)
+		{
+			int count = 0;
+			for (const auto &attr : db.getPrototype())
+			{
+				PredicateGroup temp;
+				for (const auto &pred : a)
+				{
+					if (pred.key == attr)
+						temp.push_back(pred);
+				}
+				if (temp.empty()) continue;
+
+				if (attr == "UNIVERSITY")
+				{
+					// stupid order
+					const vector<string> universities = { "UofA", "UniSA", "Flinders" };
+					for (const auto &uni : universities)
+					{
+						for (const auto &t : temp)
+						{
+							if (t.val == uni) printOnePredicate(t, count ++);
+						}
+					}
+				}
+				else if (attr == "PROGRAM")
+				{
+					const vector<string> programs = { "PhD", "MCS", "MSE", "BCS", "BSE" };
+					for (const auto &program : programs)
+					{
+						for (const auto &t : temp)
+						{
+							if (t.val == program) printOnePredicate(t, count ++);
+						}
+					}
+				}
+				else
+				{
+					// move smaller one to the end
+					if (temp.size() != 1)
+					{
+						assert(temp.size() == 2);
+						if (atoi(temp[0].val.c_str()) < atoi(temp[1].val.c_str()))
+						{
+							swap(temp[0], temp[1]);
+						}
+
+						// output the second one
+						printOnePredicate(temp[1], count++);
+					}
+
+					// always have one
+					printOnePredicate(temp[0], count++);
+				}
+			}
+			cout << endl;
+		}
 	}
 
 	void run()
@@ -865,10 +950,10 @@ public:
 		auto result = pHorizontal();
 
 		// remove empty sets (this function is not part of PHORIZONTAL algorithm)
-		result = clearEmptyFragments(result);
+		auto fragments = clearEmptyFragments(result);
 
 		// sort and output
-		printResult();
+		printResult(fragments);
 	}
 
 };
