@@ -277,7 +277,7 @@ private:
 	 */
 	void deleteFragment(const unsigned index)
 	{
-		assert(index < fragments.size());
+		assert(index < fragments.size() && fragments.size() == coids.size());
 		fragments.erase(fragments.begin() + index);
 		coids.erase(coids.begin() + index);
 	}
@@ -512,6 +512,7 @@ public:
 				{
 					// can only be size 2
 					// between case, sort from op = >/>= to op = </<=
+					assert(relevantPredicates.size() == 2);
 					if (relevantPredicates[0].op == LESS_THAN || relevantPredicates[0].op == LESS_THAN_OR_EQUAL_TO)
 					{
 						swap(relevantPredicates[0], relevantPredicates[1]);
@@ -770,7 +771,8 @@ public:
 					if (q.key == mergedPredicateGroup[i].key)
 					{
 						// for enum type, must full match; otherwise only number matching is enough becuase in fragmentation it will pick the not(predicate) automatically
-						if ((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op && q.val == mergedPredicateGroup[i].val || q.val == mergedPredicateGroup[i].val)
+						if (((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op && q.val == mergedPredicateGroup[i].val) ||
+							(q.op != EQUAL && q.op != NOT_EQUAL && q.val == mergedPredicateGroup[i].val))
 						{
 							ret.push_back(q);
 							mergedPredicateGroup.erase(mergedPredicateGroup.begin() + i);
