@@ -381,7 +381,7 @@ public:
 			PredicateGroup relevantPredicates = getPredicatesByAttr(i, p.key);
 			if (relevantPredicates.empty())
 			{
-				// no, need to create for this attribute on existing fragments
+				// no such predicates, need to create for this attribute on existing fragments
 				PredicateGroup newFragment1 = fragment;
 				newFragment1.push_back(Predicate(p.key, p.op, p.val));
 				PredicateGroup newFragment2 = fragment;
@@ -870,6 +870,7 @@ public:
 		vector<PredicateGroup> ret;
 		const auto &fragment = f.getAllFragments();
 		const auto &records = f.getFragmentRecordIds();
+		assert(fragment.size() == records.size());
 		for (unsigned i = 0; i < records.size(); i ++)
 		{
 			if (!records[i].empty())

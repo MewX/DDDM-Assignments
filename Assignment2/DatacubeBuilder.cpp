@@ -4,8 +4,22 @@
  * @author Yuanzhong Xia (a1700831)
  */
 #include "DatacubeBuilder.h"
+#include <string>
 
-void buildCuboid(std::string dbFileName)
+using namespace std;
+
+/**
+ * the constructor
+ */
+DatacubeBuilder::DatacubeBuilder()
+{
+	// TODO:
+}
+
+/**
+ * the required function
+ */
+void DatacubeBuilder::buildCuboid(char *dbFileName)
 {
 	// TODO:
 }
