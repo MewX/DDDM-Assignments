@@ -654,7 +654,7 @@ public:
 	 * the constructor
 	 */
 	PrimaryHorizentalFragmentation(const Table &db, const Queries &queries, const PredicateGroups &predicates)
-		: db(db), queries(queries), predicates(predicates) { }
+		: db(clearDb(db, queries)), queries(queries), predicates(predicates) { }
 
 	/**
 	 * validate relevant rule:
@@ -771,8 +771,7 @@ public:
 					if (q.key == mergedPredicateGroup[i].key)
 					{
 						// for enum type, must full match; otherwise only number matching is enough becuase in fragmentation it will pick the not(predicate) automatically
-						if (((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op && q.val == mergedPredicateGroup[i].val) ||
-							(q.op != EQUAL && q.op != NOT_EQUAL && q.val == mergedPredicateGroup[i].val))
+						if (q.val == mergedPredicateGroup[i].val && ((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op) || q.op != EQUAL && q.op != NOT_EQUAL)
 						{
 							ret.push_back(q);
 							mergedPredicateGroup.erase(mergedPredicateGroup.begin() + i);
@@ -845,6 +844,18 @@ public:
 		} while (!validateComplete(PrQuote));
 
 		return PrQuote;
+	}
+
+	/**
+	 * remove unused data becuase it would produce unused fragments
+	 */
+	static Table clearDb(const Table &table, const Queries &appes)
+	{
+		for (unsigned i = 0; i < table.size(); i ++)
+		{
+			// TODO:
+		}
+		return table;
 	}
 
 	/**
@@ -1116,36 +1127,44 @@ int main(int argc, char **argv)
 	vector<string> lines;
 
 	// read database file
+	cout << "db:" << endl;
 	ifstream fileDatabase(FILE_DATABASE);
 	while (getline(fileDatabase, line))
 	{
 		if (line.empty()) continue;
 		lines.push_back(line);
+		cout << line << endl;
 	}
 	fileDatabase.close();
 	const auto inTable = parseTable(lines);
 
 	// read applications/queries
 	lines.clear();
+	cout << "app:" << endl;
 	ifstream fileApp(FILE_QUERY);
 	while (getline(fileApp, line))
 	{
 		if (line.empty()) continue;
 		lines.push_back(line);
+		cout << line << endl;
 	}
 	fileApp.close();
 	const auto inQueries = parseQueries(lines, inTable.getPrototype());
 
 	// read predicates
 	lines.clear();
+	cout << "pred:" << endl;
 	ifstream filePredicates(FILE_SIMPLE_PREDICATE);
 	while (getline(filePredicates, line))
 	{
 		if (line.empty()) continue;
 		lines.push_back(line);
+		cout << line << endl;
 	}
 	filePredicates.close();
 	const auto inPredicateGroups = parsePredicateGroups(lines);
+	cout << "----" << endl;
+	cerr << "----" << endl;
 
 	// run the algorithm
 	PrimaryHorizentalFragmentation phf(inTable, inQueries, inPredicateGroups);
