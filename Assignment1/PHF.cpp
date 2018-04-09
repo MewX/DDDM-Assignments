@@ -277,7 +277,7 @@ private:
 	 */
 	void deleteFragment(const unsigned index)
 	{
-		assert(index < fragments.size() && fragments.size() == coids.size());
+		assert(index < fragments.size());
 		fragments.erase(fragments.begin() + index);
 		coids.erase(coids.begin() + index);
 	}
@@ -381,7 +381,7 @@ public:
 			PredicateGroup relevantPredicates = getPredicatesByAttr(i, p.key);
 			if (relevantPredicates.empty())
 			{
-				// no such predicates, need to create for this attribute on existing fragments
+				// no, need to create for this attribute on existing fragments
 				PredicateGroup newFragment1 = fragment;
 				newFragment1.push_back(Predicate(p.key, p.op, p.val));
 				PredicateGroup newFragment2 = fragment;
@@ -512,7 +512,6 @@ public:
 				{
 					// can only be size 2
 					// between case, sort from op = >/>= to op = </<=
-					assert(relevantPredicates.size() == 2);
 					if (relevantPredicates[0].op == LESS_THAN || relevantPredicates[0].op == LESS_THAN_OR_EQUAL_TO)
 					{
 						swap(relevantPredicates[0], relevantPredicates[1]);
@@ -654,7 +653,7 @@ public:
 	 * the constructor
 	 */
 	PrimaryHorizentalFragmentation(const Table &db, const Queries &queries, const PredicateGroups &predicates)
-		: db(clearDb(db, queries)), queries(queries), predicates(predicates) { }
+		: db(db), queries(queries), predicates(predicates) { }
 
 	/**
 	 * validate relevant rule:
@@ -771,7 +770,7 @@ public:
 					if (q.key == mergedPredicateGroup[i].key)
 					{
 						// for enum type, must full match; otherwise only number matching is enough becuase in fragmentation it will pick the not(predicate) automatically
-						if (q.val == mergedPredicateGroup[i].val && ((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op) || q.op != EQUAL && q.op != NOT_EQUAL)
+						if ((q.op == EQUAL || q.op == NOT_EQUAL) && q.op == mergedPredicateGroup[i].op && q.val == mergedPredicateGroup[i].val || q.val == mergedPredicateGroup[i].val)
 						{
 							ret.push_back(q);
 							mergedPredicateGroup.erase(mergedPredicateGroup.begin() + i);
@@ -847,18 +846,6 @@ public:
 	}
 
 	/**
-	 * remove unused data becuase it would produce unused fragments
-	 */
-	static Table clearDb(const Table &table, const Queries &appes)
-	{
-		for (unsigned i = 0; i < table.size(); i ++)
-		{
-			// TODO:
-		}
-		return table;
-	}
-
-	/**
 	 * the algorithm 3.2: PHORIZONTAL algorithm
 	 */
 	void pHorizontal() const
@@ -883,7 +870,6 @@ public:
 		vector<PredicateGroup> ret;
 		const auto &fragment = f.getAllFragments();
 		const auto &records = f.getFragmentRecordIds();
-		assert(fragment.size() == records.size());
 		for (unsigned i = 0; i < records.size(); i ++)
 		{
 			if (!records[i].empty())
@@ -1127,44 +1113,36 @@ int main(int argc, char **argv)
 	vector<string> lines;
 
 	// read database file
-	cout << "db:" << endl;
 	ifstream fileDatabase(FILE_DATABASE);
 	while (getline(fileDatabase, line))
 	{
 		if (line.empty()) continue;
 		lines.push_back(line);
-		cout << line << endl;
 	}
 	fileDatabase.close();
 	const auto inTable = parseTable(lines);
 
 	// read applications/queries
 	lines.clear();
-	cout << "app:" << endl;
 	ifstream fileApp(FILE_QUERY);
 	while (getline(fileApp, line))
 	{
 		if (line.empty()) continue;
 		lines.push_back(line);
-		cout << line << endl;
 	}
 	fileApp.close();
 	const auto inQueries = parseQueries(lines, inTable.getPrototype());
 
 	// read predicates
 	lines.clear();
-	cout << "pred:" << endl;
 	ifstream filePredicates(FILE_SIMPLE_PREDICATE);
 	while (getline(filePredicates, line))
 	{
 		if (line.empty()) continue;
 		lines.push_back(line);
-		cout << line << endl;
 	}
 	filePredicates.close();
 	const auto inPredicateGroups = parsePredicateGroups(lines);
-	cout << "----" << endl;
-	cerr << "----" << endl;
 
 	// run the algorithm
 	PrimaryHorizentalFragmentation phf(inTable, inQueries, inPredicateGroups);
