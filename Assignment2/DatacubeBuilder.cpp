@@ -324,7 +324,8 @@ void DatacubeBuilder::topkQuery(std::vector<std::string> &fullQuery, const unsig
 		});
 
 		// print result
-		for (unsigned i = 0; i < min(outList.size(), numOfResult); i ++)
+		const unsigned upperBound = outList.size() < numOfResult ? outList.size() : numOfResult;
+		for (unsigned i = 0; i < upperBound; i ++)
 		{
 			if (result[outList[i]] == 0) break;
 			if (i == 0) cout << outList[i];
