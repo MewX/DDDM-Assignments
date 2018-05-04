@@ -114,6 +114,7 @@ void DatacubeBuilder::buildCuboid(const char *dbFileName)
 	while (getline(fileDatabase, line))
 	{
 		if (line.empty()) continue;
+		cout << line << endl;
 		lines.push_back(line);
 	}
 	fileDatabase.close();
