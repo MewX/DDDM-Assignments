@@ -12,7 +12,8 @@
 // types
 typedef std::vector<std::pair<std::string, int>> CODE_TABLE;
 
-class DatacubeBuilder {
+class DatacubeBuilder
+{
 private:
 	const std::string QUERY_ALL = "ALL";
 	const std::string QUERY_QUESTION = "?";
@@ -24,49 +25,49 @@ private:
 	const CODE_TABLE SCHOLARSHIP_CODE_TABLE;
 	const std::vector<CODE_TABLE> CODE_TABLES;
 
-	int findValueFromKey(const CODE_TABLE &table, const std::string &key) const;
-	int findValueFromKey(const std::string &key) const;
-	std::string findKeyFromValue(const CODE_TABLE &table, int value) const;
+	int findValueFromKey(const CODE_TABLE& table, const std::string& key) const;
+	int findValueFromKey(const std::string& key) const;
+	std::string findKeyFromValue(const CODE_TABLE& table, int value) const;
 	bool caseInsensitiveStringCompare(std::string a, std::string b) const;
 
 	void build5dCuboid(const std::vector<std::string> lines);
 	void buildAllLowerCuboids();
 
-	void sumQuery(std::vector<std::string> &fullQuery) const;
-	void topkQuery(std::vector<std::string> &fullQuery, const unsigned numOfResult) const;
+	void sumQuery(std::vector<std::string>& fullQuery) const;
+	void topkQuery(std::vector<std::string>& fullQuery, const unsigned numOfResult) const;
 
 public:
 	//5-D Cuboid
 	//University-Program-Term-Nationality-Scholarship
-	int uptnsCuboid[4][6][5][6][2] = {0};
+	int uptnsCuboid[4][6][5][6][2] = {{{{{0}}}}};
 	//4-D Cuboid
-	int uptnCuboid[4][6][5][6] = {0};
-	int uptsCuboid[4][6][5][2] = {0};
-	int upnsCuboid[4][6][6][2] = {0};
-	int utnsCuboid[4][5][6][2] = {0};
-	int ptnsCuboid[6][5][6][2] = {0};
+	int uptnCuboid[4][6][5][6] = {{{{0}}}};
+	int uptsCuboid[4][6][5][2] = {{{{0}}}};
+	int upnsCuboid[4][6][6][2] = {{{{0}}}};
+	int utnsCuboid[4][5][6][2] = {{{{0}}}};
+	int ptnsCuboid[6][5][6][2] = {{{{0}}}};
 	//3-D Cuboid
-	int uptCuboid[4][6][5] = {0};
-	int upnCuboid[4][6][6] = {0};
-	int upsCuboid[4][6][2] = {0};
-	int utnCuboid[4][5][6] = {0};
-	int utsCuboid[4][5][2] = {0};
-	int unsCuboid[3][6][2] = {0};
-	int ptnCuboid[6][5][6] = {0};
-	int ptsCuboid[6][5][2] = {0};
-	int pnsCuboid[6][6][2] = {0};
-	int tnsCuboid[5][6][2] = {0};
+	int uptCuboid[4][6][5] = {{{0}}};
+	int upnCuboid[4][6][6] = {{{0}}};
+	int upsCuboid[4][6][2] = {{{0}}};
+	int utnCuboid[4][5][6] = {{{0}}};
+	int utsCuboid[4][5][2] = {{{0}}};
+	int unsCuboid[3][6][2] = {{{0}}};
+	int ptnCuboid[6][5][6] = {{{0}}};
+	int ptsCuboid[6][5][2] = {{{0}}};
+	int pnsCuboid[6][6][2] = {{{0}}};
+	int tnsCuboid[5][6][2] = {{{0}}};
 	//2-D Cuboid
-	int upCuboid[4][6] = {0};
-	int utCuboid[4][5] = {0};
-	int unCuboid[4][6] = {0};
-	int usCuboid[4][2] = {0};
-	int ptCuboid[6][5] = {0};
-	int pnCuboid[6][6] = {0};
-	int psCuboid[6][2] = {0};
-	int tnCuboid[5][6] = {0};
-	int tsCuboid[5][2] = {0};
-	int nsCuboid[6][2] = {0};
+	int upCuboid[4][6] = {{0}};
+	int utCuboid[4][5] = {{0}};
+	int unCuboid[4][6] = {{0}};
+	int usCuboid[4][2] = {{0}};
+	int ptCuboid[6][5] = {{0}};
+	int pnCuboid[6][6] = {{0}};
+	int psCuboid[6][2] = {{0}};
+	int tnCuboid[5][6] = {{0}};
+	int tsCuboid[5][2] = {{0}};
+	int nsCuboid[6][2] = {{0}};
 	//1-D Cuboid
 	int uCuboid[4] = {0};
 	int pCuboid[6] = {0};
@@ -83,11 +84,11 @@ public:
 	// Please make it as a public function.
 	// The parameter to this function will be argv[1] to the main() in our driver
 	// i.e. the database.txt
-	void buildCuboid(const char *);
+	void buildCuboid(const char*);
 
-	void runQuery(const char *) const;
+	void runQuery(const char*) const;
 
-	std::vector<std::string> split(const std::string &s, const char delim) const;
+	std::vector<std::string> split(const std::string& s, const char delim) const;
 };
 
 #endif
