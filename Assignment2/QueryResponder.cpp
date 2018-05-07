@@ -22,6 +22,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <map>
 using namespace std;
 
 // type defines
@@ -87,6 +88,7 @@ int findValueFromKey(const CODE_TABLE &table, const std::string &key)
 		}
 	}
 	assert(false); // should not run into here from the given input
+	return NULL;
 }
 
 /**
@@ -105,6 +107,7 @@ int findValueFromKey(const std::string& key)
 		}
 	}
 	assert(false); // should not run into here from the given input
+	return NULL;
 }
 
 /**
@@ -120,6 +123,7 @@ std::string findKeyFromValue(const CODE_TABLE &table, const int value)
 		}
 	}
 	assert(false); // should not run into here from the given input
+	return NULL;
 }
 
 /**

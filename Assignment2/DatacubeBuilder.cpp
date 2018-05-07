@@ -38,9 +38,10 @@ int DatacubeBuilder::findValueFromKey(const CODE_TABLE &table, const std::string
 		}
 	}
 	assert(false); // should not run into here from the given input
+	return NULL;
 }
 
-bool DatacubeBuilder::caseInsensitiveStringCompare(std::string a, std::string b) const
+bool DatacubeBuilder::caseInsensitiveStringCompare(std::string a, std::string b)
 {
 	if (a.size() != b.size()) {
         return false;

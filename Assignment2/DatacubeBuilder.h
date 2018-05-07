@@ -22,13 +22,10 @@ private:
 	const CODE_TABLE SCHOLARSHIP_CODE_TABLE;
 
 	int findValueFromKey(const CODE_TABLE& table, const std::string& key) const;
-	bool caseInsensitiveStringCompare(std::string a, std::string b) const;
+	static bool caseInsensitiveStringCompare(std::string a, std::string b);
 
 	void build5dCuboid(const std::vector<std::string> lines);
 	void buildAllLowerCuboids();
-
-	void sumQuery(std::vector<std::string>& fullQuery) const;
-	void topkQuery(std::vector<std::string>& fullQuery, const unsigned numOfResult) const;
 
 public:
 	//5-D Cuboid
@@ -79,8 +76,6 @@ public:
 	// The parameter to this function will be argv[1] to the main() in our driver
 	// i.e. the database.txt
 	void buildCuboid(const char*);
-
-	void runQuery(const char*) const;
 
 	std::vector<std::string> split(const std::string& s, const char delim) const;
 };
