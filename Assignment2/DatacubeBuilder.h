@@ -15,19 +15,13 @@ typedef std::vector<std::pair<std::string, int>> CODE_TABLE;
 class DatacubeBuilder
 {
 private:
-	const std::string QUERY_ALL = "ALL";
-	const std::string QUERY_QUESTION = "?";
-
 	const CODE_TABLE UNIVERSITY_CODE_TABLE;
 	const CODE_TABLE PROGRAM_CODE_TABLE;
 	const CODE_TABLE TERM_CODE_TABLE;
 	const CODE_TABLE NATIONALITY_CODE_TABLE;
 	const CODE_TABLE SCHOLARSHIP_CODE_TABLE;
-	const std::vector<CODE_TABLE> CODE_TABLES;
 
 	int findValueFromKey(const CODE_TABLE& table, const std::string& key) const;
-	int findValueFromKey(const std::string& key) const;
-	std::string findKeyFromValue(const CODE_TABLE& table, int value) const;
 	bool caseInsensitiveStringCompare(std::string a, std::string b) const;
 
 	void build5dCuboid(const std::vector<std::string> lines);
