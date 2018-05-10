@@ -9,7 +9,6 @@
 #include <sstream>
 #include <cassert>
 #include <fstream>
-#include <iostream>
 
 using namespace std;
 
@@ -86,7 +85,6 @@ void DatacubeBuilder::buildCuboid(const char *dbFileName)
 	while (getline(fileDatabase, line))
 	{
 		if (line.empty()) continue;
-		cout << line << endl;
 		lines.push_back(line);
 	}
 	fileDatabase.close();
@@ -112,7 +110,7 @@ void DatacubeBuilder::build5dCuboid(const vector<string> lines)
 		const int enrolment = atoi(tokens[5].c_str());
 
 		// set it
-		uptnsCuboid[uni][program][term][nation][scholarship] = enrolment;
+		uptnsCuboid[uni][program][term][nation][scholarship] += enrolment; // to avoid duplicated records
 	}
 }
 
